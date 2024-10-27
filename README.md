@@ -3,7 +3,7 @@ Really Inefficient Cron Wrapper made in C (C11)
 
 ### Usage
 
-$ Usage: ricw [OPTION]... <args>
+    Usage: ricw [OPTION]... <args>
     Easy and inefficient way to set up a cron task!
 
     With no OPTION, this text is printed to standard output
