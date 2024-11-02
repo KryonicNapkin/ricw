@@ -15,7 +15,7 @@
 #define DEFAULT_NAME "Task"
 #define TASK_VALS 5
 #define CRONTIME_VALS 5
-#define LIST_WIDTH 105
+#define LIST_WIDTH 108
 #define CMD_VALS 7
 #define DELIM " \t\r\a\n"
 
@@ -480,7 +480,7 @@ void list_tasks(const char* filename) {
         fprintf(stderr, "Error: Cannot list tasks!\n");
         exit(EXIT_FAILURE);
     }
-    int sep_arr[7] = {5, 11, 37, 47, 55, 67, 89};
+    int sep_arr[7] = {5, 11, 37, 47, 58, 70, 92};
 
     printf(DOUBLE_UPLEFT_CORNER);
     for (int i = 0, d = 0; i < LIST_WIDTH-CMD_VALS; ++i) {
@@ -492,7 +492,7 @@ void list_tasks(const char* filename) {
     }
 
     printf(DOUBLE_UPRIGHT_CORNER "\n");
-    printf(DOUBLE_BAR " Nth "SINGLE_BAR"  ID  "SINGLE_BAR" MIN  HOUR DMON MON  WDAY "SINGLE_BAR" URGENCY  "SINGLE_BAR" DELAY  "SINGLE_BAR"    NAME    "SINGLE_BAR"         DESC         "SINGLE_BAR" IS_DONE \u2551\n");
+    printf(DOUBLE_BAR " Nth "SINGLE_BAR"  ID  "SINGLE_BAR" MIN  HOUR DMON MON  WDAY "SINGLE_BAR" URGENCY  "SINGLE_BAR" DELAY(ms) "SINGLE_BAR"    NAME    "SINGLE_BAR"         DESC         "SINGLE_BAR" IS_DONE \u2551\n");
 
     printf(DOUBLE_BAR_SINGLE_DASH_CENTER_RIGHT);
     for (int i = 0, d = 0; i < LIST_WIDTH-CMD_VALS; ++i) {
@@ -512,10 +512,10 @@ void list_tasks(const char* filename) {
         if (strlen(tasks[i-1].cmd.desc) > 20) {
             strtrunc(tasks[i-1].cmd.desc, 20, "...\"");
         } 
-        printf(DOUBLE_BAR " %03d "SINGLE_BAR" %04ld "SINGLE_BAR" %-4s %-4s %-4s %-4s %-4s "SINGLE_BAR" %-8s "SINGLE_BAR" %.3lfs "SINGLE_BAR" %-10s "SINGLE_BAR" %-20s "SINGLE_BAR"    %d    \u2551\n", 
+        printf(DOUBLE_BAR " %03d "SINGLE_BAR" %04ld "SINGLE_BAR" %-4s %-4s %-4s %-4s %-4s "SINGLE_BAR" %-8s "SINGLE_BAR" %-9d "SINGLE_BAR" %-10s "SINGLE_BAR" %-20s "SINGLE_BAR"    %d    \u2551\n", 
                i, tasks[i-1].id, tasks[i-1].crtime.min, tasks[i-1].crtime.hour, tasks[i-1].crtime.dmon,
                tasks[i-1].crtime.mon,tasks[i-1].crtime.wday, get_urgency(tasks[i-1].cmd.urgency), 
-               (float)(tasks[i-1].cmd.delay)/1000, tasks[i-1].cmd.name, tasks[i-1].cmd.desc,
+               (tasks[i-1].cmd.delay), tasks[i-1].cmd.name, tasks[i-1].cmd.desc,
                tasks[i-1].is_done);
     }
 
