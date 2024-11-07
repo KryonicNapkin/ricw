@@ -107,6 +107,8 @@ char* get_urgency(urg_t urg_num);
 urg_t load_urgency(const char* str_urg);
 /* Variadic system function */
 int vsystem(const char* cmd, ...);
+/* Copy line by line from str1 to str2 */
+int data_copy(const char* src, const char* dest);
 
 int main(int argc, char* argv[]) {
     task_t task;
@@ -258,7 +260,39 @@ int main(int argc, char* argv[]) {
                 add_task(tasks_path, task);
                 goto update_cron;
                 break;
-            case 'e':
+            case 'i':
+                if (argc != 3) {
+                    fprintf(stderr, "Error: Invalid number of arguments!\n");
+                    exit(EXIT_FAILURE);
+                }
+                if (access(argv[2], F_OK) == -1) {
+                    fprintf(stderr, "Error: Cannot find %s :%s\n", argv[2], strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
+                char new_tasks[512 + 256];
+                sprintf(new_tasks, "%s%s", tasks_path, "_back");
+                if (data_copy(tasks_path, new_tasks) == -1) {
+                    fprintf(stderr, "Error: Cannot create a backup of the tasks: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
+                if (rename(argv[2], tasks_path) == -1) {
+                    fprintf(stderr, "Error: Cannot import tasks: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
+                break;
+            case 'e':;
+                if (argc != 3) {
+                    fprintf(stderr, "Error: Invalid number of arguments!\n");
+                    exit(EXIT_FAILURE);
+                }
+                char* export = c_strdup(argv[2]);
+                if (data_copy(tasks_path, export) == -1) {
+                    fprintf(stderr, "Error: Cannot create a backup: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
+                free(export);
+                break;
+            case 'c':
                 vsystem("vim %s", tasks_path);
                 goto update_cron;
                 break;
@@ -347,7 +381,9 @@ void usage(void) {
     fprintf(stdout, "\n");
     fprintf(stdout, "    -a <-o|<name>> <delay> <urg> <desc> <crontime>    add task \n");
     fprintf(stdout, "    -o                                    if passed, <name> will not be assaign to the task, instead it will be the default name + char\n");
-    fprintf(stdout, "    -e                                    edit the .crontab file (!WARNING! DO NOT USE UNLESS YOU KNOW THE RICW SYNTAX)\n");
+    fprintf(stdout, "    -c                                    edit the tasks file (!WARNING! DO NOT USE UNLESS YOU KNOW THE CRON SYNTAX)\n");
+    fprintf(stdout, "    -i <name>                             import earlier exported tasks to ricw\n");
+    fprintf(stdout, "    -e <name>                             export current user's configuration of created tasks\n");
     fprintf(stdout, "    -d <valid_id>                         delete a task with <valid_id> from .tasks file and .crontab file\n");
     fprintf(stdout, "    -l                                    list all tasks from .tasks file\n");
     fprintf(stdout, "    -s <init_id>                          set initial id to <init_id>\n");
@@ -768,4 +804,22 @@ int add_staging(task_t task) {
     snprintf(staging, sizeof(staging), "%s/%s", work_path, STG_FILENAME);
     add_task(staging, task);
     return update_cron(staging);
+}
+
+int data_copy(const char* src, const char* dest) {
+    FILE* source_f = fopen(src, "r");
+    if (source_f == NULL) {
+        return -1;
+    }
+    FILE* destination_f = fopen(dest, "w");
+    if (destination_f == NULL) {
+        return -1;
+    }
+    char buff[1024];
+    while (fgets(buff, sizeof(buff), source_f) != NULL) {
+        fputs(buff, destination_f);
+    }
+    fclose(source_f);
+    fclose(destination_f);
+    return 1;
 }
