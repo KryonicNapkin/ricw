@@ -8,9 +8,11 @@ Really Inefficient Cron Wrapper made in C (C11)
 
     With no OPTION, this text is printed to standard output
 
-        -a <-o|<name>> <delay> <urg> <desc> <crontime>    add task 
+        -a <-o|<name>> <delay> <urg> <desc> <crontime>    add task
         -o                                    if passed, <name> will not be assaign to the task, instead it will be the default name + char
-        -e                                    edit the .crontab file (!WARNING! DO NOT USE UNLESS YOU KNOW THE RICW SYNTAX)
+        -c                                    edit the tasks file (!WARNING! DO NOT USE UNLESS YOU KNOW THE CRON SYNTAX)
+        -i <name>                             import earlier exported tasks to ricw
+        -e <name>                             export current user's configuration of created tasks
         -d <valid_id>                         delete a task with <valid_id> from .tasks file and .crontab file
         -l                                    list all tasks from .tasks file
         -s <init_id>                          set initial id to <init_id>
