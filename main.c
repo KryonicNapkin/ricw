@@ -377,8 +377,6 @@ void usage(void) {
     fprintf(stdout, "Usage: ricw [OPTION]... <args>\n");
     fprintf(stdout, "Easy and inefficient way to set up a cron task!\n");
     fprintf(stdout, "\n");
-    fprintf(stdout, "With no OPTION, this text is printed to standard output\n");
-    fprintf(stdout, "\n");
     fprintf(stdout, "    -a <-o|<name>> <delay> <urg> <desc> <crontime>    add task \n");
     fprintf(stdout, "    -o                                    if passed, <name> will not be assaign to the task, instead it will be the default name + char\n");
     fprintf(stdout, "    -c                                    edit the tasks file (!WARNING! DO NOT USE UNLESS YOU KNOW THE CRON SYNTAX)\n");
