@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 
@@ -9,15 +10,10 @@ char* strenc(char* str, char enclose_char) {
         return str;
     }
     size_t len = strlen(str);
-    char* dup_str = malloc(len + 2 + 1);
+    size_t sz = len+2+1;
+    char* dup_str = malloc(sz);
 
-    dup_str[0] = enclose_char;
-    for (int i = 1; i <= len; ++i) {
-        memset(&dup_str[i], str[i-1], 1);
-    }
-    dup_str[len+1] = enclose_char;
-    dup_str[len+2] = '\0';
-    str = dup_str;
+    snprintf(dup_str, sz, "%c%s%c", enclose_char, str, enclose_char);
     return dup_str;
 }
 
