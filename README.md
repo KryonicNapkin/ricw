@@ -2,7 +2,7 @@
 Really Inefficient Cron Wrapper made in C (C11)
 
 ### Usage
-Long options doesn't work and I don't even want to implement them :(
+Long options doesn't work and I don't even want to implement them :( \n
 If someone create an issue about it I would implement them. But this project
 is so useless and unheared of that I don't have to worry about that :)
 
