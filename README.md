@@ -1,6 +1,9 @@
 # ricw
 Really Inefficient Cron Wrapper made in C (C11)
 
+### Usage
+Long options doesn't work and probably I don't even implement them :(
+
     $ ricw -h
 
     Usage: ricw [OPTION]... <args>
