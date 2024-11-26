@@ -412,7 +412,7 @@ int add_task(const char* filename, task_t task) {
 
 char* gen_name(const char* init_str) {
     char* name = malloc(32);
-    char* charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    const char* charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
     char c = *(charset+(get_id(id_path) % strlen(charset)));
     snprintf(name, 32, "%s%c", init_str, c);
     return name;
