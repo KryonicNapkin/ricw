@@ -700,6 +700,7 @@ urg_t load_urgency(const char* str_urg) {
     }
     return ERROR;
 }
+
 const char* get_urgency(urg_t urg_num) {
     switch (urg_num) {
         case LOW:
@@ -715,7 +716,6 @@ const char* get_urgency(urg_t urg_num) {
             return NULL;
         break;
     }
-    return NULL;
 }
 
 task_t get_task(const char* filename, long id) {
