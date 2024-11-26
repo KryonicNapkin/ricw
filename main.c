@@ -17,6 +17,7 @@
 #define CRONTIME_VALS 5
 #define LIST_WIDTH 108
 #define CMD_VALS 7
+#define MAX_CRON_VAL_LEN 16
 #define DELIM " \t\r\a\n"
 
 #define SINGLE_BAR "\u2502"
@@ -102,7 +103,7 @@ int set_id(const char* filename, long init);
 /* Check if the id is valid */
 int valid_id(long id);
 /* get urgency name from the number */
-char* get_urgency(urg_t urg_num);
+const char* get_urgency(urg_t urg_num);
 /* load urgency string form to urg_t  */
 urg_t load_urgency(const char* str_urg);
 /* Variadic system function */
@@ -647,7 +648,7 @@ int timeconvr(const char* str, struct crtime_t* crontime) {
     /* Cron time format "*;*;*;*;*" */
     char** crtime = malloc(CRONTIME_VALS * sizeof(char*));
     for (int i = 0; i < CRONTIME_VALS; ++i) {
-        crtime[i] = malloc(8);
+        crtime[i] = malloc(MAX_CRON_VAL_LEN);
     }
     char* str_time = c_strdup(str);
     char* token;
@@ -699,7 +700,7 @@ urg_t load_urgency(const char* str_urg) {
     }
     return ERROR;
 }
-char* get_urgency(urg_t urg_num) {
+const char* get_urgency(urg_t urg_num) {
     switch (urg_num) {
         case LOW:
             return "low";
