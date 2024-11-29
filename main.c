@@ -39,6 +39,17 @@ char* id_path;
 char* tasks_path;
 
 typedef enum {
+    NAME = 0,
+    CRONTIME,
+    DESC,
+} expand_value_t;
+
+typedef struct {
+    long id;
+    expand_value_t val;
+} cntr_t;
+
+typedef enum {
     ERROR = -1,
     LOW,
     NORMAL,
@@ -77,6 +88,10 @@ int update_cron(char* crontab);
 char* get_prep_cmd(void);
 /* Usage */
 void usage(void);
+/* Init task */
+void init_task(task_t* task);
+/* is task null */
+int is_task_null(task_t task);
 /* add task to .tasks file*/
 int add_task(const char* filename, task_t task);
 /* Add task to .staging file for syntax checking*/
@@ -110,9 +125,14 @@ urg_t load_urgency(const char* str_urg);
 int vsystem(const char* cmd, ...);
 /* Copy line by line from str1 to str2 */
 int data_copy(const char* src, const char* dest);
+/* Expand field of the task for the full display of value */
+char* expand_value(char** return_val, const long id, expand_value_t value);
+/* Get control string from str */
+cntr_t get_cntr_str(const char* str);
 
 int main(int argc, char* argv[]) {
     task_t task;
+    init_task(&task);
     struct crtime_t crontime;
     char* endptr = NULL;
     int is_crontab = has_crontab();
@@ -256,6 +276,12 @@ int main(int argc, char* argv[]) {
                     exit(EXIT_FAILURE);
                 }
                 task = get_task(tasks_path, id);
+                if (is_task_null(task)) {
+                    fprintf(stderr, "Error: Could not obtain informations about \
+                                    the task with id: %ld\n", id);
+                    unset_paths(&work_path, &id_path, &tasks_path);
+                    exit(EXIT_FAILURE);
+                }
                 del_task(tasks_path, id);
                 task.is_done = !task.is_done;
                 add_task(tasks_path, task);
@@ -299,6 +325,41 @@ int main(int argc, char* argv[]) {
                 break;
             case 'p':
                 fprintf(stdout, "default name    : %s\n", DEFAULT_NAME);
+                break;
+            case 'x':
+                if (argc != 3) {
+                    fprintf(stderr, "Error: Invalid number of arguments!\n");
+                    exit(EXIT_FAILURE);
+                }
+                char buff[256];
+                char* str;
+                cntr_t cntr_str = get_cntr_str(argv[2]);
+                if (cntr_str.id == -1 && cntr_str.val == -1) {
+                    fprintf(stderr, "Error: Cannot obtain the full value!\n");
+                    unset_paths(&work_path, &id_path, &tasks_path);
+                    exit(EXIT_FAILURE);
+                }
+                expand_value(&str, cntr_str.id, cntr_str.val);
+                printf("Task with id: %ld\n", cntr_str.id);
+                switch (cntr_str.val) {
+                    case NAME:
+                        strcpy(buff, "name");
+                        break;
+                    case DESC:
+                        strcpy(buff, "desc");
+                        break;
+                    case CRONTIME:
+                        strcpy(buff, "crontime");
+                        break;
+                    default:
+                        fprintf(stderr, "Error: Cannot obtain the full value!\n");
+                        unset_paths(&work_path, &id_path, &tasks_path);
+                        free(str);
+                        exit(EXIT_FAILURE);
+                        break;
+                }
+                printf("Full %s is %s\n", buff, str);
+                free(str);
                 break;
             case 'h':
                 usage();
@@ -387,9 +448,19 @@ void usage(void) {
     fprintf(stdout, "    -l                                    list all tasks from .tasks file\n");
     fprintf(stdout, "    -s <init_id>                          set initial id to <init_id>\n");
     fprintf(stdout, "    -r                                    reset the id counter back to 0\n");
+    fprintf(stdout, "    -x <cntr_str>                         eXpand one the task value (possible values: t/d/n) see FORMAT\n");
     fprintf(stdout, "    -m <valid_id>                         mark task with an id of <valid_id> as !is_done\n");
     fprintf(stdout, "    -p                                    print defaults\n");
     fprintf(stdout, "    -h                                    print this help message\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "cntr_str (CONTROL STRING):\n");
+    fprintf(stdout, "FORMAT: <id><t/d/n>\n");
+    fprintf(stdout, "\n");
+    fprintf(stdout, "    <id>               id of the task that you want to select\n");
+    fprintf(stdout, "    <t>                't' if you want to expand the task's crontime\n");
+    fprintf(stdout, "    <d>                'd' if you want to expand the task's description\n");
+    fprintf(stdout, "    <n>                'n' if you want to expand the task's name\n");
+
 }
 
 int add_task(const char* filename, task_t task) {
@@ -547,6 +618,21 @@ void list_tasks(const char* filename) {
         if (strlen(tasks[i-1].cmd.desc) > 20) {
             strtrunc(tasks[i-1].cmd.desc, 20, "...\"");
         } 
+        if (strlen(tasks[i-1].crtime.min) > 4) {
+            strtrunc(tasks[i-1].crtime.min, 4, ">");
+        }
+        if (strlen(tasks[i-1].crtime.mon) > 4) {
+            strtrunc(tasks[i-1].crtime.mon, 4, ">");
+        }
+        if (strlen(tasks[i-1].crtime.hour) > 4) {
+            strtrunc(tasks[i-1].crtime.hour, 4, ">");
+        }
+        if (strlen(tasks[i-1].crtime.dmon) > 4) {
+            strtrunc(tasks[i-1].crtime.dmon, 4, ">");
+        }
+        if (strlen(tasks[i-1].crtime.wday) > 4) {
+            strtrunc(tasks[i-1].crtime.wday, 4, ">");
+        }
         printf(DOUBLE_BAR " %03d "SINGLE_BAR" %04ld "SINGLE_BAR" %-4s %-4s %-4s %-4s %-4s "SINGLE_BAR" %-8s "SINGLE_BAR" %-9d "SINGLE_BAR" %-10s "SINGLE_BAR" %-20s "SINGLE_BAR"    %d    \u2551\n", 
                i, tasks[i-1].id, tasks[i-1].crtime.min, tasks[i-1].crtime.hour, tasks[i-1].crtime.dmon,
                tasks[i-1].crtime.mon,tasks[i-1].crtime.wday, get_urgency(tasks[i-1].cmd.urgency), 
@@ -719,7 +805,8 @@ const char* get_urgency(urg_t urg_num) {
 }
 
 task_t get_task(const char* filename, long id) {
-    task_t task = {NULL};
+    task_t task;
+    init_task(&task);
     struct crtime_t crontime;
     char* token;
     int task_id = -1;
@@ -821,4 +908,91 @@ int data_copy(const char* src, const char* dest) {
     fclose(source_f);
     fclose(destination_f);
     return 1;
+}
+
+/* Init task */
+void init_task(task_t* task) {
+    task->id = -1;
+    task->is_done = false;
+    task->prep_cmd = NULL;
+}
+
+/* is task null */
+int is_task_null(task_t task) {
+    if (task.id == -1 && task.prep_cmd == NULL && task.is_done == false) {
+        return 1;
+    }
+    return 0;
+}
+
+char* expand_value(char** return_val, const long id, expand_value_t value) {
+    char buff[32];
+    if (!valid_id(id)) {
+        return *return_val;
+    }
+    task_t task = get_task(tasks_path, id);
+    if (is_task_null(task)) {
+        return *return_val;
+    }
+    switch (value) {
+        case NAME:
+            *return_val = c_strdup(task.cmd.name);
+            break;
+        case CRONTIME:
+            snprintf(buff, sizeof(buff), "%s;%s;%s;%s;%s", task.crtime.min,
+                     task.crtime.hour, task.crtime.dmon, task.crtime.mon, 
+                     task.crtime.wday);
+            *return_val = c_strdup(buff);
+            break;
+        case DESC:
+            *return_val = c_strdup(task.cmd.desc);
+            break;
+        default:
+            return *return_val;
+            break;
+    }
+    return *return_val;
+}
+
+cntr_t get_cntr_str(const char* str) {
+    cntr_t control_str = {
+        .id = -1,
+        .val = -1,
+    };
+    size_t len = strlen(str);
+    char* endptr = NULL;
+    long id;
+    int ptr = 0;
+    if (len > 2 || len == 0) {
+        return control_str;
+    } 
+    const char* valid_chars = "tdn";
+    id = strtol(str, &endptr, 10);
+    if (id == 0 && str == endptr) {
+        return control_str;
+    } 
+    if (!valid_id(id)) {
+        return control_str;
+    }
+    for (int i = 0; i < strlen(valid_chars); ++i) {
+        if (*endptr == valid_chars[i]) {
+            switch (valid_chars[i]) {
+                case 't':
+                    control_str.val = CRONTIME;
+                    break;
+                case 'd':
+                    control_str.val = DESC;
+                    break;
+                case 'n':
+                    control_str.val = NAME;
+                    break;
+                default:
+                    return control_str;
+                    break;
+            }
+            control_str.id = id;
+            return control_str; 
+        }
+    }
+    return control_str;
 }
