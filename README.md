@@ -20,6 +20,15 @@ is so useless and unheared of that I don't have to worry about that :)
         -l                                    list all tasks from .tasks file
         -s <init_id>                          set initial id to <init_id>
         -r                                    reset the id counter back to 0
+        -x <cntr_str>                         eXpand one the task value (possible values: t/d/n) see FORMAT
         -m <valid_id>                         mark task with an id of <valid_id> as !is_done
         -p                                    print defaults
         -h                                    print this help message
+
+    cntr_str (CONTROL STRING):
+    FORMAT: <id><t/d/n>
+
+        <id>               id of the task that you want to select
+        <t>                't' if you want to expand the task's crontime
+        <d>                'd' if you want to expand the task's description
+        <n>                'n' if you want to expand the task's name
