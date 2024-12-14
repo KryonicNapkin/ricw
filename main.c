@@ -9,15 +9,16 @@
 #include <dirent.h>
 #include <errno.h>
 
-#include "pathdec.h"
-#include "strf.h"
+#include "libs/path_def.h"
+#include "libs/strf.h"
+#include "libs/num_def.h"
 
 #define DEFAULT_NAME "Task"
+#define CMD_VALS 7
 #define TASK_VALS 5
 #define CRONTIME_VALS 5
+#define MISC_CMD_FLAGS 4
 #define LIST_WIDTH 108
-#define CMD_VALS 7
-#define MAX_CRON_VAL_LEN 16
 #define DELIM " \t\r\a\n"
 
 #define SINGLE_BAR "\u2502"
@@ -34,20 +35,38 @@
 #define SINGLE_BAR_DASH_LAY "\u2534"
 #define DOUBLE_BAR_DASH_DOWN "\u2564"
 
-char* work_path;
-char* id_path;
-char* tasks_path;
+char work_path[MAX_PATH_LEN];
+char id_path[MULTI_PATH_LEN(2)];
+char tasks_path[MULTI_PATH_LEN(2)];
 
 typedef enum {
-    NAME = 0,
-    CRONTIME,
+    MIN = 0,
+    HOUR,
+    DMON,
+    MON,
+    WDAY,
+    PREP_CMD,
+    SEND_CMD,
+    TIME_FLAG,
+    DELAY,
+    URG_FLAG,
+    URGENCY,
+    NAME,
     DESC,
+    ID = 14,
+} idx_val_t;
+
+typedef enum {
+    INIT = -1,
+    NM,
+    CRONTIME,
+    DSC,
 } expand_value_t;
 
 typedef struct {
     long id;
     expand_value_t val;
-} cntr_t;
+} cntrl_t;
 
 typedef enum {
     ERROR = -1,
@@ -128,7 +147,7 @@ int data_copy(const char* src, const char* dest);
 /* Expand field of the task for the full display of value */
 char* expand_value(char** return_val, const long id, expand_value_t value);
 /* Get control string from str */
-cntr_t get_cntr_str(const char* str);
+cntrl_t get_cntrl_str(const char* str);
 
 int main(int argc, char* argv[]) {
     task_t task;
@@ -171,7 +190,6 @@ int main(int argc, char* argv[]) {
         set_id(id_path, 0);
     } else if (work_dir) {
     } else {
-        unset_paths(&work_path, &id_path, &tasks_path);
         fprintf(stderr, "Error: Cannot open %s\n%s\n", work_path, strerror(errno));
         exit(EXIT_FAILURE);
     }
@@ -188,12 +206,12 @@ int main(int argc, char* argv[]) {
                     has_name = false;
                 }
                 delay = (unsigned int)strtol(argv[3], &endptr, 10);
-                if (argv[3] == endptr) {
+                if (argv[3] == endptr && delay == 0) {
                     fprintf(stderr, "Error: Cannot convert delay to a number!\n");
                     exit(EXIT_FAILURE);
                 }
                 urgency = (urg_t)strtol(argv[4], &endptr, 10);
-                if (argv[4] == endptr) {
+                if (argv[4] == endptr && urgency == 0) {
                     fprintf(stderr, "Error: Cannot convert urgency to a number!\n");
                     exit(EXIT_FAILURE);
                 }
@@ -214,12 +232,10 @@ int main(int argc, char* argv[]) {
                 status = add_staging(task);
                 if (remove(strcat(work_path, "/" STG_FILENAME)) == -1) {
                     fprintf(stderr, "Error: Cannot remove %s\n%s\n", work_path, strerror(errno));
-                    unset_paths(&work_path, &id_path, &tasks_path);
                     exit(EXIT_FAILURE);
                 };
                 if (status) {
                     fprintf(stderr, "Error: Bad Syntax!\n");
-                    unset_paths(&work_path, &id_path, &tasks_path);
                     exit(EXIT_FAILURE);
                 }
                 add_task(tasks_path, task);
@@ -232,6 +248,10 @@ int main(int argc, char* argv[]) {
                     exit(EXIT_FAILURE);
                 }
                 id = strtol(argv[2], &endptr, 10); 
+                if (endptr == argv[2] && id == 0) {
+                    fprintf(stderr, "Error: %s\n", strerror(errno));
+                    exit(EXIT_FAILURE);
+                }
                 if (!valid_id(id)) {
                     fprintf(stderr, "Error: Invalid id of task passed!\n");
                     exit(EXIT_FAILURE);
@@ -255,7 +275,7 @@ int main(int argc, char* argv[]) {
                     exit(EXIT_FAILURE);
                 }
                 id = strtol(argv[2], &endptr, 10);
-                if (endptr == argv[2]) {
+                if (endptr == argv[2] && id == 0) {
                     fprintf(stderr, "Error: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
@@ -267,7 +287,7 @@ int main(int argc, char* argv[]) {
                     exit(EXIT_FAILURE);
                 }
                 id = strtol(argv[2], &endptr, 10);
-                if (endptr == argv[2]) {
+                if (endptr == argv[2] && id == 0) {
                     fprintf(stderr, "Error: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
@@ -279,7 +299,6 @@ int main(int argc, char* argv[]) {
                 if (is_task_null(task)) {
                     fprintf(stderr, "Error: Could not obtain informations about \
                                     the task with id: %ld\n", id);
-                    unset_paths(&work_path, &id_path, &tasks_path);
                     exit(EXIT_FAILURE);
                 }
                 del_task(tasks_path, id);
@@ -296,7 +315,7 @@ int main(int argc, char* argv[]) {
                     fprintf(stderr, "Error: Cannot find %s :%s\n", argv[2], strerror(errno));
                     exit(EXIT_FAILURE);
                 }
-                char new_tasks[512 + 256];
+                char new_tasks[MULTI_PATH_LEN(2)+MEDIUM_BUFF_SIZE];
                 sprintf(new_tasks, "%s%s", tasks_path, "_back");
                 if (data_copy(tasks_path, new_tasks) == -1) {
                     fprintf(stderr, "Error: Cannot create a backup of the tasks: %s\n", strerror(errno));
@@ -312,12 +331,10 @@ int main(int argc, char* argv[]) {
                     fprintf(stderr, "Error: Invalid number of arguments!\n");
                     exit(EXIT_FAILURE);
                 }
-                char* export = c_strdup(argv[2]);
-                if (data_copy(tasks_path, export) == -1) {
+                if (data_copy(tasks_path, argv[2]) == -1) {
                     fprintf(stderr, "Error: Cannot create a backup: %s\n", strerror(errno));
                     exit(EXIT_FAILURE);
                 }
-                free(export);
                 break;
             case 'c':
                 vsystem("vim %s", tasks_path);
@@ -331,29 +348,28 @@ int main(int argc, char* argv[]) {
                     fprintf(stderr, "Error: Invalid number of arguments!\n");
                     exit(EXIT_FAILURE);
                 }
-                char buff[256];
+                char buff[SMALL_BUFF_SIZE];
                 char* str;
-                cntr_t cntr_str = get_cntr_str(argv[2]);
-                if (cntr_str.id == -1 && cntr_str.val == -1) {
+                cntrl_t cntrl_str = get_cntrl_str(argv[2]);
+                if (cntrl_str.id == -1 && cntrl_str.val == -1) {
                     fprintf(stderr, "Error: Cannot obtain the full value!\n");
-                    unset_paths(&work_path, &id_path, &tasks_path);
                     exit(EXIT_FAILURE);
                 }
-                expand_value(&str, cntr_str.id, cntr_str.val);
-                printf("Task with id: %ld\n", cntr_str.id);
-                switch (cntr_str.val) {
-                    case NAME:
+                expand_value(&str, cntrl_str.id, cntrl_str.val);
+                printf("Task with id: %ld\n", cntrl_str.id);
+                switch (cntrl_str.val) {
+                    case NM:
                         strcpy(buff, "name");
                         break;
-                    case DESC:
+                    case DSC:
                         strcpy(buff, "desc");
                         break;
                     case CRONTIME:
                         strcpy(buff, "crontime");
                         break;
+                    case INIT:
                     default:
                         fprintf(stderr, "Error: Cannot obtain the full value!\n");
-                        unset_paths(&work_path, &id_path, &tasks_path);
                         free(str);
                         exit(EXIT_FAILURE);
                         break;
@@ -370,14 +386,13 @@ int main(int argc, char* argv[]) {
                 break;
         }
     } 
-    unset_paths(&work_path, &id_path, &tasks_path);
     return status;
     update_cron:
         status = update_cron(tasks_path);
 }
 
 int has_crontab(void) {
-    char buff[256];
+    char buff[LARGE_BUFF_SIZE];
 
     FILE* fp = popen("which crontab", "r");
     if (fp == NULL) {
@@ -416,7 +431,7 @@ int update_cron(char* crontab) {
     char* const argv[] = {"crontab", crontab, NULL};
     pid_t pid = fork();
     if (pid == -1) {
-        fprintf(stderr, "Error: Cannot fork process!\n");
+       fprintf(stderr, "Error: Cannot fork process!\n");
         exit(EXIT_FAILURE);
     } else if (pid == 0) {
         execv("/usr/bin/crontab", argv);
@@ -426,7 +441,7 @@ int update_cron(char* crontab) {
 }
 
 int vsystem(const char* cmd, ...) {
-    char buff[512];
+    char buff[LARGE_BUFF_SIZE];
     va_list ap;
     va_start(ap, cmd);
     vsnprintf(buff, sizeof(buff), cmd, ap);
@@ -448,12 +463,12 @@ void usage(void) {
     fprintf(stdout, "    -l                                    list all tasks from .tasks file\n");
     fprintf(stdout, "    -s <init_id>                          set initial id to <init_id>\n");
     fprintf(stdout, "    -r                                    reset the id counter back to 0\n");
-    fprintf(stdout, "    -x <cntr_str>                         eXpand one the task value (possible values: t/d/n) see FORMAT\n");
+    fprintf(stdout, "    -x <cntrl_str>                        eXpand one the task value (possible values: t/d/n) see FORMAT\n");
     fprintf(stdout, "    -m <valid_id>                         mark task with an id of <valid_id> as !is_done\n");
     fprintf(stdout, "    -p                                    print defaults\n");
     fprintf(stdout, "    -h                                    print this help message\n");
     fprintf(stdout, "\n");
-    fprintf(stdout, "cntr_str (CONTROL STRING):\n");
+    fprintf(stdout, "cntrl_str (CONTROL STRING):\n");
     fprintf(stdout, "FORMAT: <id><t/d/n>\n");
     fprintf(stdout, "\n");
     fprintf(stdout, "    <id>               id of the task that you want to select\n");
@@ -483,16 +498,16 @@ int add_task(const char* filename, task_t task) {
 }
 
 char* gen_name(const char* init_str) {
-    char* name = malloc(32);
+    char* name = malloc(SMALL_BUFF_SIZE);
     const char* charset = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    char c = *(charset+(get_id(id_path) % strlen(charset)));
-    snprintf(name, 32, "%s%c", init_str, c);
+    const char c = *(charset+(get_id(id_path) % strlen(charset)));
+    snprintf(name, SMALL_BUFF_SIZE, "%s%c", init_str, c);
     return name;
 }
 
 int del_task(const char* filename, long id) {
     const char* tmp_filename = ".tmptasks";
-    char buff[1024];
+    char buff[LINE_BUFF_SIZE];
     int task_id = 0;
     FILE* task_f = fopen(filename, "r");
     FILE* temp_f = fopen(tmp_filename, "a");
@@ -530,43 +545,43 @@ task_t* get_tasks(const char* filename) {
         return NULL;
     }
     task_t* tasks = malloc(num * sizeof(task_t));
-    int num_vals = TASK_VALS + CMD_VALS + 4;
+    int num_vals = TASK_VALS + CMD_VALS + MISC_CMD_FLAGS;
     char** vals = malloc(num_vals * sizeof(char*));
     struct crtime_t crontime;
 
-    int index = 0, tindex = 0;
-    char buff[1024];
+    int idx = 0, tindex = 0;
+    char buff[LINE_BUFF_SIZE];
     char* token;
     while (fgets(buff, sizeof(buff), fp) != NULL) {
         for (int i = 0; i < num_vals; ++i) {
-            vals[i] = malloc(128);
+            vals[i] = malloc(LONG_BUFF_SIZE);
         }
         int add_index = 0;
         if (!strncmp(buff, "#-", 2)) {
-            ++add_index;
+            add_index = 1;
         } 
         token = strmbtok(buff, DELIM, "\"", "\"");
         while (token != NULL) {
-            vals[index] = c_strdup(token);
+            vals[idx] = c_strdup(token);
             token = strmbtok(NULL, DELIM, "\"", "\"");
-            index++;
+            idx++;
         }
-        index = 0;
+        idx = 0;
         crontime = (struct crtime_t) {
-            .min = c_strdup(vals[add_index+0]),
-            .hour = c_strdup(vals[add_index+1]),
-            .dmon = c_strdup(vals[add_index+2]),
-            .mon = c_strdup(vals[add_index+3]),
-            .wday = c_strdup(vals[add_index+4]),
+            .min = c_strdup(vals[add_index+MIN]),
+            .hour = c_strdup(vals[add_index+HOUR]),
+            .dmon = c_strdup(vals[add_index+DMON]),
+            .mon = c_strdup(vals[add_index+MON]),
+            .wday = c_strdup(vals[add_index+WDAY]),
         };
         tasks[tindex] = (task_t) {
-            .id = strtol(vals[add_index+14], NULL, 10),
+            .id = strtol(vals[add_index+ID], NULL, 10),
             .crtime = crontime,
-            .prep_cmd = c_strdup(vals[add_index+5]),
-            .cmd.delay = (unsigned int)strtol(vals[add_index+8], NULL, 10),
-            .cmd.urgency = (unsigned int)load_urgency(vals[add_index+10]),
-            .cmd.name = c_strdup(vals[add_index+11]),
-            .cmd.desc = c_strdup(vals[add_index+12]),
+            .prep_cmd = c_strdup(vals[add_index+PREP_CMD]),
+            .cmd.delay = (unsigned int)strtol(vals[add_index+DELAY], NULL, 10),
+            .cmd.urgency = (unsigned int)load_urgency(vals[add_index+URGENCY]),
+            .cmd.name = c_strdup(vals[add_index+NAME]),
+            .cmd.desc = c_strdup(vals[add_index+DESC]),
             .is_done = add_index,
         };
         for (int x = 0; x < num_vals; ++x) {
@@ -584,9 +599,10 @@ void list_tasks(const char* filename) {
     ssize_t tasks_c = task_count(filename);
     if (!tasks_c || tasks_c == -1) {
         fprintf(stderr, "Error: Cannot list tasks!\n");
+        free(tasks);
         exit(EXIT_FAILURE);
     }
-    int sep_arr[7] = {5, 11, 37, 47, 58, 70, 92};
+    const int sep_arr[] = {5, 11, 37, 47, 58, 70, 92};
 
     printf(DOUBLE_UPLEFT_CORNER);
     for (int i = 0, d = 0; i < LIST_WIDTH-CMD_VALS; ++i) {
@@ -654,7 +670,7 @@ void list_tasks(const char* filename) {
 
 ssize_t task_count(const char* filename) {
     ssize_t num_tasks = 0;
-    char buff[1024];
+    char buff[LINE_BUFF_SIZE];
     FILE* fp = fopen(filename, "r");
     if (fp == NULL) {
         return -1;
@@ -667,7 +683,7 @@ ssize_t task_count(const char* filename) {
 }
 
 long get_id(const char* filename) {
-    char buff[16];
+    char buff[SMALL_BUFF_SIZE];
     char* endptr = NULL;
     long id = 0;
     FILE* fp = fopen(filename, "r");
@@ -717,6 +733,7 @@ int valid_id(long id) {
     task_t* tasks = get_tasks(tasks_path);
     ssize_t tasks_c = task_count(tasks_path);
     if (!tasks_c || tasks_c == -1) {
+        free(tasks);
         return -1;
     }
     
@@ -739,7 +756,7 @@ int timeconvr(const char* str, struct crtime_t* crontime) {
     char* str_time = c_strdup(str);
     char* token;
     int count = 0;
-    int index = 0;
+    int idx = 0;
     size_t len = strlen(str_time);
 
     if (len < 9) {
@@ -757,9 +774,9 @@ int timeconvr(const char* str, struct crtime_t* crontime) {
     }
     token = strtok(str_time, DELIM ";");
     while (token != NULL) {
-        crtime[index] = c_strdup(token);
+        crtime[idx] = c_strdup(token);
         token = strtok(NULL, DELIM ";");
-        index++;
+        idx++;
     }
     crontime->min = crtime[0];
     crontime->hour = crtime[1];
@@ -810,10 +827,10 @@ task_t get_task(const char* filename, long id) {
     struct crtime_t crontime;
     char* token;
     int task_id = -1;
-    int num_vals = TASK_VALS + CMD_VALS + 4;
+    int num_vals = TASK_VALS + CMD_VALS + MISC_CMD_FLAGS;
     char** vals = malloc(num_vals * sizeof(char*));
-    char buff[1024];
-    int index = 0;
+    char buff[LINE_BUFF_SIZE];
+    int idx = 0;
     FILE* tasks_f = fopen(filename, "r");
     if (tasks_f == NULL) {
         return task;
@@ -821,38 +838,38 @@ task_t get_task(const char* filename, long id) {
 
     while (fgets(buff, sizeof(buff), tasks_f) != NULL) {
         for (int i = 0; i < num_vals; ++i) {
-            vals[i] = malloc(128);
+            vals[i] = malloc(LONG_BUFF_SIZE);
         }
         int add_index = 0;
         if (!strncmp(buff, "#-", 2)) {
-            ++add_index;
-        } 
+            add_index = 1;
+        }
         char* str = c_strdup(buff);
         token = strmbtok(buff, DELIM, "\"", "\"");
         while (token != NULL) {
-            vals[index] = c_strdup(token);
+            vals[idx] = c_strdup(token);
             token = strmbtok(NULL, DELIM, "\"", "\"");
-            index++;
+            idx++;
         }
-        index = 0;
+        idx = 0;
         char* it = strrchr(str, '#');
         sscanf(it, "# %d\n", &task_id);
         if (id == task_id) {
             crontime = (struct crtime_t) {
-                .min = c_strdup(vals[add_index+0]),
-                .hour = c_strdup(vals[add_index+1]),
-                .dmon = c_strdup(vals[add_index+2]),
-                .mon = c_strdup(vals[add_index+3]),
-                .wday = c_strdup(vals[add_index+4]),
+                .min = c_strdup(vals[add_index+MIN]),
+                .hour = c_strdup(vals[add_index+HOUR]),
+                .dmon = c_strdup(vals[add_index+DMON]),
+                .mon = c_strdup(vals[add_index+MON]),
+                .wday = c_strdup(vals[add_index+WDAY]),
             };
             task = (task_t) {
-                .id = strtol(vals[add_index+14], NULL, 10),
+                .id = strtol(vals[add_index+ID], NULL, 10),
                 .crtime = crontime,
-                .prep_cmd = c_strdup(vals[add_index+5]),
-                .cmd.delay = strtol(vals[add_index+8], NULL, 10),
-                .cmd.urgency = load_urgency(vals[add_index+10]),
-                .cmd.name = c_strdup(vals[add_index+11]),
-                .cmd.desc = c_strdup(vals[add_index+12]),
+                .prep_cmd = c_strdup(vals[add_index+PREP_CMD]),
+                .cmd.delay = strtol(vals[add_index+DELAY], NULL, 10),
+                .cmd.urgency = load_urgency(vals[add_index+URGENCY]),
+                .cmd.name = c_strdup(vals[add_index+NAME]),
+                .cmd.desc = c_strdup(vals[add_index+DESC]),
                 .is_done = add_index,
             };
         }
@@ -867,7 +884,7 @@ task_t get_task(const char* filename, long id) {
 }
 
 char* get_prep_cmd(void) {
-    char* prep_cmd = malloc(128);
+    char* prep_cmd = malloc(LONG_BUFF_SIZE);
     unsigned int user_id = 0;
 
     FILE* pp = popen("id -u", "r");
@@ -880,13 +897,13 @@ char* get_prep_cmd(void) {
         pclose(pp);
         return NULL;
     }
-    snprintf(prep_cmd, 128, "XDG_RUNTIME_DIR=/run/user/%u", user_id);
+    snprintf(prep_cmd, LONG_BUFF_SIZE, "XDG_RUNTIME_DIR=/run/user/%u", user_id);
     pclose(pp);
     return prep_cmd;
 }
 
 int add_staging(task_t task) {
-    char staging[64];
+    char staging[MAX_PATH_LEN+MEDIUM_BUFF_SIZE];
     snprintf(staging, sizeof(staging), "%s/%s", work_path, STG_FILENAME);
     add_task(staging, task);
     return update_cron(staging);
@@ -901,7 +918,7 @@ int data_copy(const char* src, const char* dest) {
     if (destination_f == NULL) {
         return -1;
     }
-    char buff[1024];
+    char buff[LINE_BUFF_SIZE];
     while (fgets(buff, sizeof(buff), source_f) != NULL) {
         fputs(buff, destination_f);
     }
@@ -926,7 +943,7 @@ int is_task_null(task_t task) {
 }
 
 char* expand_value(char** return_val, const long id, expand_value_t value) {
-    char buff[32];
+    char buff[SMALL_BUFF_SIZE];
     if (!valid_id(id)) {
         return *return_val;
     }
@@ -935,7 +952,7 @@ char* expand_value(char** return_val, const long id, expand_value_t value) {
         return *return_val;
     }
     switch (value) {
-        case NAME:
+        case NM:
             *return_val = c_strdup(task.cmd.name);
             break;
         case CRONTIME:
@@ -944,9 +961,10 @@ char* expand_value(char** return_val, const long id, expand_value_t value) {
                      task.crtime.wday);
             *return_val = c_strdup(buff);
             break;
-        case DESC:
+        case DSC:
             *return_val = c_strdup(task.cmd.desc);
             break;
+        case INIT:
         default:
             return *return_val;
             break;
@@ -954,19 +972,18 @@ char* expand_value(char** return_val, const long id, expand_value_t value) {
     return *return_val;
 }
 
-cntr_t get_cntr_str(const char* str) {
-    cntr_t control_str = {
+cntrl_t get_cntrl_str(const char* str) {
+    cntrl_t control_str = {
         .id = -1,
-        .val = -1,
+        .val = INIT,
     };
     size_t len = strlen(str);
     char* endptr = NULL;
     long id;
-    int ptr = 0;
-    if (len > 2 || len == 0) {
+    if (len > CNTRL_STR_LEN || len == 0) {
         return control_str;
     } 
-    const char* valid_chars = "tdn";
+    static const char* valid_chars = "tdn";
     id = strtol(str, &endptr, 10);
     if (id == 0 && str == endptr) {
         return control_str;
@@ -981,10 +998,10 @@ cntr_t get_cntr_str(const char* str) {
                     control_str.val = CRONTIME;
                     break;
                 case 'd':
-                    control_str.val = DESC;
+                    control_str.val = DSC;
                     break;
                 case 'n':
-                    control_str.val = NAME;
+                    control_str.val = NM;
                     break;
                 default:
                     return control_str;
