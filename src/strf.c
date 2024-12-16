@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../libs/strf.h"
+#include "strf.h"
 
 /* Function to enclose str in char enclose_char */
 char* strenc(char* str, char enclose_char) {

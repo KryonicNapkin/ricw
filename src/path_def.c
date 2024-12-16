@@ -1,9 +1,9 @@
 #include <stdio.h>      /* For snprintf */
 #include <stdlib.h>     /* For getenv */
 
-#include "../libs/num_def.h"    /* Number definitions for the lenght of paths*/
+#include "num_def.h"    /* Number definitions for the lenght of paths*/
 
-#include "../libs/path_def.h"    /* Global path variables */
+#include "path_def.h"    /* Global path variables */
 
 /* this functions sets the default path for all the files 
  * and directories for this program to work
