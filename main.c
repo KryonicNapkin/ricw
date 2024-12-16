@@ -9,9 +9,11 @@
 #include <dirent.h>
 #include <errno.h>
 
-#include "libs/path_def.h"
-#include "libs/strf.h"
-#include "libs/num_def.h"
+#include "src/path_def.h"
+#include "src/strf.h"
+#include "src/num_def.h"
+
+#include "src/fort.h"
 
 #define DEFAULT_NAME "Task"
 #define CMD_VALS 7
@@ -20,20 +22,6 @@
 #define MISC_CMD_FLAGS 4
 #define LIST_WIDTH 108
 #define DELIM " \t\r\a\n"
-
-#define SINGLE_BAR "\u2502"
-#define SINGLE_DASH "\u2500"
-#define DOUBLE_BAR "\u2551"
-#define DOUBLE_DASH "\u2550"
-#define DOUBLE_UPLEFT_CORNER "\u2554"
-#define DOUBLE_UPRIGHT_CORNER "\u2557"
-#define DOUBLE_BAR_SINGLE_DASH_DOWNLEFT_CORNER "\u2559"
-#define DOUBLE_BAR_SINGLE_DASH_DOWNRIGHT_CORNER "\u255C"
-#define DOUBLE_BAR_SINGLE_DASH_CENTER_RIGHT "\u255F"
-#define DOUBLE_BAR_SINGLE_DASH_CENTER_LEFT "\u2562"
-#define SINGLE_CROSS "\u253C"
-#define SINGLE_BAR_DASH_LAY "\u2534"
-#define DOUBLE_BAR_DASH_DOWN "\u2564"
 
 char work_path[MAX_PATH_LEN];
 char id_path[MULTI_PATH_LEN(2)];
@@ -87,7 +75,7 @@ typedef struct {
     bool is_done;
     long id;
     struct crtime_t crtime;
-    char* prep_cmd;
+    const char* prep_cmd;
     struct cmd_t {
         unsigned int delay;
         urg_t urgency;
@@ -97,7 +85,7 @@ typedef struct {
 } task_t;
 
 /* Function prototypes */
-/* Check if cronie or fcron is installed is installed*/
+/* Check if cronie or fcron is installed */
 int has_crontab(void);
 /* Initialize work directory and all files*/
 void init_dir(char* work_path, char* id_path, char* tasks_path);
@@ -211,6 +199,10 @@ int main(int argc, char* argv[]) {
                     exit(EXIT_FAILURE);
                 }
                 urgency = (urg_t)strtol(argv[4], &endptr, 10);
+                if (urgency > 2 || urgency < 0) {
+                    fprintf(stderr, "Error: Cannot convert number to an urgency type!\n");
+                    exit(EXIT_FAILURE);
+                }
                 if (argv[4] == endptr && urgency == 0) {
                     fprintf(stderr, "Error: Cannot convert urgency to a number!\n");
                     exit(EXIT_FAILURE);
@@ -475,7 +467,6 @@ void usage(void) {
     fprintf(stdout, "    <t>                't' if you want to expand the task's crontime\n");
     fprintf(stdout, "    <d>                'd' if you want to expand the task's description\n");
     fprintf(stdout, "    <n>                'n' if you want to expand the task's name\n");
-
 }
 
 int add_task(const char* filename, task_t task) {
@@ -597,74 +588,30 @@ task_t* get_tasks(const char* filename) {
 void list_tasks(const char* filename) {
     task_t* tasks = get_tasks(filename);
     ssize_t tasks_c = task_count(filename);
-    if (!tasks_c || tasks_c == -1) {
+
+    if (tasks_c == -1) {
         fprintf(stderr, "Error: Cannot list tasks!\n");
         free(tasks);
         exit(EXIT_FAILURE);
     }
-    const int sep_arr[] = {5, 11, 37, 47, 58, 70, 92};
 
-    printf(DOUBLE_UPLEFT_CORNER);
-    for (int i = 0, d = 0; i < LIST_WIDTH-CMD_VALS; ++i) {
-        if (sep_arr[d] == i) {
-            printf(DOUBLE_BAR_DASH_DOWN);
-            ++d;
-        }
-        printf(DOUBLE_DASH);
-    }
-
-    printf(DOUBLE_UPRIGHT_CORNER "\n");
-    printf(DOUBLE_BAR " Nth "SINGLE_BAR"  ID  "SINGLE_BAR" MIN  HOUR DMON MON  WDAY "SINGLE_BAR" URGENCY  "SINGLE_BAR" DELAY(ms) "SINGLE_BAR"    NAME    "SINGLE_BAR"         DESC         "SINGLE_BAR" IS_DONE \u2551\n");
-
-    printf(DOUBLE_BAR_SINGLE_DASH_CENTER_RIGHT);
-    for (int i = 0, d = 0; i < LIST_WIDTH-CMD_VALS; ++i) {
-        if (sep_arr[d] == i) {
-            printf(SINGLE_CROSS);
-            ++d;
-        }
-        printf(SINGLE_DASH);
-    }
-
-    printf(DOUBLE_BAR_SINGLE_DASH_CENTER_LEFT);
-    printf("\n");
+    ft_table_t* tasks_table = ft_create_table();
+    ft_set_border_style(tasks_table, FT_DOUBLE2_STYLE);
+    ft_set_cell_prop(tasks_table, 0, FT_ANY_COLUMN, FT_CPROP_ROW_TYPE, FT_ROW_HEADER);
+    ft_set_cell_prop(tasks_table, 0, FT_ANY_COLUMN, FT_CPROP_TEXT_ALIGN, FT_ALIGNED_CENTER);
+    ft_set_cell_prop(tasks_table, 0, FT_ANY_COLUMN, FT_CPROP_CONT_FG_COLOR, FT_COLOR_BLUE);
+    ft_set_cell_prop(tasks_table, 0, FT_ANY_COLUMN, FT_CPROP_CONT_TEXT_STYLE, FT_TSTYLE_BOLD);
+    ft_write_ln(tasks_table, "Nth", "ID", "MIN", "HOUR", "DMON", "MON", "WDAY", "URGENCY", "DELAY(ms)", "NAME", "DESC", "IS_DONE");
     for (int i = 1; i <= tasks_c; ++i) {
-        if (strlen(tasks[i-1].cmd.name) > 10) {
-            strtrunc(tasks[i-1].cmd.name, 10, "...\"");
-        } 
-        if (strlen(tasks[i-1].cmd.desc) > 20) {
-            strtrunc(tasks[i-1].cmd.desc, 20, "...\"");
-        } 
-        if (strlen(tasks[i-1].crtime.min) > 4) {
-            strtrunc(tasks[i-1].crtime.min, 4, ">");
-        }
-        if (strlen(tasks[i-1].crtime.mon) > 4) {
-            strtrunc(tasks[i-1].crtime.mon, 4, ">");
-        }
-        if (strlen(tasks[i-1].crtime.hour) > 4) {
-            strtrunc(tasks[i-1].crtime.hour, 4, ">");
-        }
-        if (strlen(tasks[i-1].crtime.dmon) > 4) {
-            strtrunc(tasks[i-1].crtime.dmon, 4, ">");
-        }
-        if (strlen(tasks[i-1].crtime.wday) > 4) {
-            strtrunc(tasks[i-1].crtime.wday, 4, ">");
-        }
-        printf(DOUBLE_BAR " %03d "SINGLE_BAR" %04ld "SINGLE_BAR" %-4s %-4s %-4s %-4s %-4s "SINGLE_BAR" %-8s "SINGLE_BAR" %-9d "SINGLE_BAR" %-10s "SINGLE_BAR" %-20s "SINGLE_BAR"    %d    \u2551\n", 
+        ft_printf_ln(tasks_table, "%d|%ld|%s|%s|%s|%s|%s|%s|%d|%5s|%s|%d", 
                i, tasks[i-1].id, tasks[i-1].crtime.min, tasks[i-1].crtime.hour, tasks[i-1].crtime.dmon,
                tasks[i-1].crtime.mon,tasks[i-1].crtime.wday, get_urgency(tasks[i-1].cmd.urgency), 
                (tasks[i-1].cmd.delay), tasks[i-1].cmd.name, tasks[i-1].cmd.desc,
                tasks[i-1].is_done);
-    }
+    } 
+    printf("%s\n", ft_to_string(tasks_table));
+    ft_destroy_table(tasks_table);
 
-    printf(DOUBLE_BAR_SINGLE_DASH_DOWNLEFT_CORNER);
-    for (int i = 0, d = 0; i < LIST_WIDTH-CMD_VALS; ++i) {
-        if (sep_arr[d] == i) {
-            printf(SINGLE_BAR_DASH_LAY);
-            ++d;
-        }
-        printf(SINGLE_DASH);
-    }
-    printf(DOUBLE_BAR_SINGLE_DASH_DOWNRIGHT_CORNER "\n");
     free(tasks);
 }
 
