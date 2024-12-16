@@ -1,11 +1,10 @@
 CC      = gcc
 CFLAGS  = -std=gnu11 -Os -g -Wall -Wconversion -Wextra -Wpedantic
-LIBS    = ./libs
-SRC     = ./src
+SRC     = src
 
 all: build
 
-build: main.c $(SRC)/path_def.c $(SRC)/strf.c
+build: main.c $(SRC)/path_def.c $(SRC)/strf.c $(SRC)/fort.c
 	$(CC) ${CFLAGS} -o ricw $^
 	chmod 775 ricw
 
