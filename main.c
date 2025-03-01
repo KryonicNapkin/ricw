@@ -198,7 +198,7 @@ int main(int argc, char* argv[]) {
                     fprintf(stderr, "Error: Cannot convert delay to a number!\n");
                     exit(EXIT_FAILURE);
                 }
-                urgency = (urg_t)strtol(argv[4], &endptr, 10);
+                urgency = strtol(argv[4], &endptr, 10);
                 if (urgency > 2 || urgency < 0) {
                     fprintf(stderr, "Error: Cannot convert number to an urgency type!\n");
                     exit(EXIT_FAILURE);
@@ -603,6 +603,20 @@ void list_tasks(const char* filename) {
     ft_set_cell_prop(tasks_table, 0, FT_ANY_COLUMN, FT_CPROP_CONT_TEXT_STYLE, FT_TSTYLE_BOLD);
     ft_write_ln(tasks_table, "Nth", "ID", "MIN", "HOUR", "DMON", "MON", "WDAY", "URGENCY", "DELAY(ms)", "NAME", "DESC", "IS_DONE");
     for (int i = 1; i <= tasks_c; ++i) {
+        switch (tasks[i-1].cmd.urgency) {
+            case LOW:
+                ft_set_cell_prop(tasks_table, i, 7, FT_CPROP_CONT_FG_COLOR, FT_COLOR_BLUE);
+                break;
+            case NORMAL:
+                ft_set_cell_prop(tasks_table, i, 7, FT_CPROP_CONT_FG_COLOR, FT_COLOR_GREEN);
+                break;
+            case CRITICAL:
+                ft_set_cell_prop(tasks_table, i, 7, FT_CPROP_CONT_FG_COLOR, FT_COLOR_RED);
+                ft_set_cell_prop(tasks_table, i, 7, FT_CPROP_CONT_TEXT_STYLE, FT_TSTYLE_BOLD);
+                break;
+            default:
+                break;
+        }
         ft_printf_ln(tasks_table, "%d|%ld|%s|%s|%s|%s|%s|%s|%d|%5s|%s|%d", 
                i, tasks[i-1].id, tasks[i-1].crtime.min, tasks[i-1].crtime.hour, tasks[i-1].crtime.dmon,
                tasks[i-1].crtime.mon,tasks[i-1].crtime.wday, get_urgency(tasks[i-1].cmd.urgency), 
